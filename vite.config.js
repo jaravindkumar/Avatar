@@ -12,4 +12,15 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three:    ['three'],
+          mediapipe: ['@mediapipe/tasks-vision'],
+          react:    ['react', 'react-dom'],
+        },
+      },
+    },
+  },
 })
