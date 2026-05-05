@@ -1,19 +1,25 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SMPLRenderer } from '../utils/SMPLRenderer.js';
+import { SyntheticAvatarRenderer } from '../utils/SyntheticAvatarRenderer.js';
 
 /**
  * Three.js 3D avatar viewer.
  *
+ * Rendering priority:
+ *  1. SMPL mesh   – when smplModel + frameParams are available
+ *  2. Synthetic capsule avatar – always available from keypoints3d (default)
+ *  3. Skeleton overlay – dots/lines, toggled via viewMode='skeleton'
+ *
  * Props:
- *  smplModel      - parsed SMPL JSON model data (or null if unavailable)
- *  frameParams    - array of {pose, shape, globalTrans} per frame (or null)
- *  currentFrame   - index into frameParams to render
- *  displayMode    - 'solid' | 'wireframe'
- *  viewMode       - 'avatar' | 'skeleton' | 'sidebyside'
- *  keypoints3d    - optional raw 3D keypoints for current frame (for skeleton view)
- *  onReady        - called with {canvas, renderFrame} so VideoExporter can capture
+ *  smplModel    - parsed SMPL JSON (optional; enables mesh mode)
+ *  frameParams  - [{pose, shape, globalTrans}] per frame (SMPL only)
+ *  currentFrame - index to render
+ *  displayMode  - 'solid' | 'wireframe'
+ *  viewMode     - 'avatar' | 'skeleton' | 'sidebyside'
+ *  keypoints3d  - [{x,y,z,confidence}] for current frame
+ *  onReady      - ({canvas, renderFrame}) callback for VideoExporter
  */
 export default function AvatarViewer({
   smplModel,
@@ -22,20 +28,18 @@ export default function AvatarViewer({
   displayMode = 'solid',
   viewMode = 'avatar',
   keypoints3d,
-  videoFrame,  // HTMLCanvasElement for side-by-side
   onReady,
 }) {
-  const mountRef      = useRef(null);
-  const threeRef      = useRef(null); // { scene, camera, renderer, controls, smplRenderer, skeletonGroup }
-  const animFrameRef  = useRef(null);
+  const mountRef = useRef(null);
+  const threeRef = useRef(null);
 
-  // ---- Scene setup ----
+  // ---- Scene setup (re-runs when smplModel changes) ----
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    // WebGL renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.shadowMap.enabled = true;
@@ -53,7 +57,7 @@ export default function AvatarViewer({
     camera.position.set(0, 1.0, 4.0);
     camera.lookAt(0, 1.0, 0);
 
-    // Controls
+    // Orbit controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 1.0, 0);
     controls.enableDamping = true;
@@ -61,80 +65,73 @@ export default function AvatarViewer({
     controls.minDistance = 1;
     controls.maxDistance = 10;
 
-    // Lighting — 3-point setup
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambient);
-
+    // 3-point lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
     keyLight.position.set(3, 5, 3);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.setScalar(1024);
     scene.add(keyLight);
-
     const fillLight = new THREE.DirectionalLight(0x8899ff, 0.5);
     fillLight.position.set(-3, 3, 1);
     scene.add(fillLight);
-
     const backLight = new THREE.DirectionalLight(0xffcc88, 0.3);
     backLight.position.set(0, 2, -4);
     scene.add(backLight);
 
-    // Grid floor
-    const grid = new THREE.GridHelper(10, 20, 0x334455, 0x222233);
-    grid.position.y = 0;
-    scene.add(grid);
+    // Grid
+    scene.add(new THREE.GridHelper(10, 20, 0x334455, 0x222233));
 
-    // Skeleton group (for keypoint visualisation)
-    const skeletonGroup = new THREE.Group();
-    scene.add(skeletonGroup);
+    // ---- Renderers ----
 
-    // SMPL mesh (if model available)
+    // 1. Synthetic capsule avatar (always available)
+    const synthRenderer = new SyntheticAvatarRenderer();
+    scene.add(synthRenderer.group);
+
+    // 2. SMPL mesh renderer (optional)
     let smplRenderer = null;
     if (smplModel) {
       try {
         smplRenderer = new SMPLRenderer(smplModel);
-        const material = new THREE.MeshPhongMaterial({
-          color: 0x4488ff,
-          emissive: 0x111122,
-          specular: 0xaabbff,
-          shininess: 40,
+        const mat = new THREE.MeshPhongMaterial({
+          color: 0x4488ff, emissive: 0x111122,
+          specular: 0xaabbff, shininess: 40,
           side: THREE.DoubleSide,
         });
-        const mesh = smplRenderer.buildMesh(material);
-        scene.add(mesh);
+        scene.add(smplRenderer.buildMesh(mat));
       } catch (err) {
         console.warn('SMPL renderer init failed:', err);
       }
     }
 
+    // 3. Skeleton overlay group
+    const skeletonGroup = new THREE.Group();
+    scene.add(skeletonGroup);
+
     // Render loop
     let animId;
-    function animate() {
+    const animate = () => {
       animId = requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
-    }
+    };
     animate();
-    animFrameRef.current = animId;
 
-    // Resize handler
-    function onResize() {
-      if (!mount) return;
+    // Resize
+    const ro = new ResizeObserver(() => {
       const w = mount.clientWidth, h = mount.clientHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
-    }
-    const ro = new ResizeObserver(onResize);
+    });
     ro.observe(mount);
 
-    threeRef.current = { scene, camera, renderer, controls, smplRenderer, skeletonGroup };
+    threeRef.current = { scene, camera, renderer, controls, smplRenderer, synthRenderer, skeletonGroup };
 
-    // Notify parent so VideoExporter can use the canvas
     onReady?.({
       canvas: renderer.domElement,
-      renderFrame: (frameIdx) => {
-        updateFrame(frameIdx, threeRef.current);
+      renderFrame: (fi) => {
+        applyFrame(fi, threeRef.current);
         renderer.render(scene, camera);
       },
     });
@@ -144,110 +141,102 @@ export default function AvatarViewer({
       ro.disconnect();
       controls.dispose();
       smplRenderer?.dispose();
+      synthRenderer.dispose();
       renderer.dispose();
-      mount.removeChild(renderer.domElement);
+      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
       threeRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [smplModel]);
 
-  // ---- Update frame when currentFrame changes ----
+  // ---- Per-frame update ----
   useEffect(() => {
     if (!threeRef.current) return;
-    updateFrame(currentFrame, threeRef.current);
+    applyFrame(currentFrame, threeRef.current);
   }, [currentFrame, frameParams, keypoints3d]);
 
-  // ---- Display mode toggle ----
+  // ---- Wireframe toggle ----
   useEffect(() => {
-    if (!threeRef.current?.smplRenderer?.mesh) return;
-    const mat = threeRef.current.smplRenderer.mesh.material;
-    mat.wireframe = displayMode === 'wireframe';
+    const t = threeRef.current;
+    if (!t) return;
+    t.synthRenderer?.setWireframe(displayMode === 'wireframe');
+    if (t.smplRenderer?.mesh) t.smplRenderer.mesh.material.wireframe = displayMode === 'wireframe';
   }, [displayMode]);
 
-  // ---- Skeleton visibility ----
+  // ---- View mode visibility ----
   useEffect(() => {
-    if (!threeRef.current?.skeletonGroup) return;
-    threeRef.current.skeletonGroup.visible = viewMode === 'skeleton' || viewMode === 'sidebyside';
-    if (threeRef.current.smplRenderer?.mesh) {
-      threeRef.current.smplRenderer.mesh.visible = viewMode === 'avatar' || viewMode === 'sidebyside';
-    }
+    const t = threeRef.current;
+    if (!t) return;
+    const showAvatar   = viewMode === 'avatar' || viewMode === 'sidebyside';
+    const showSkeleton = viewMode === 'skeleton';
+
+    t.synthRenderer.group.visible = showAvatar && !t.smplRenderer;
+    if (t.smplRenderer?.mesh) t.smplRenderer.mesh.visible = showAvatar && !!t.smplRenderer;
+    t.skeletonGroup.visible = showSkeleton;
   }, [viewMode]);
 
-  function updateFrame(frameIdx, three) {
+  // Helper: apply frame data to scene
+  function applyFrame(fi, three) {
     if (!three) return;
-    const { smplRenderer, skeletonGroup } = three;
+    const { smplRenderer, synthRenderer, skeletonGroup } = three;
 
-    // SMPL mesh deformation
-    if (smplRenderer && frameParams?.[frameIdx]) {
-      const { pose, shape, globalTrans } = frameParams[frameIdx];
+    // SMPL deformation (when model is loaded)
+    if (smplRenderer && frameParams?.[fi]) {
+      const { pose, shape, globalTrans } = frameParams[fi];
       smplRenderer.deform(pose, shape, globalTrans ?? [0, 0, 0]);
     }
 
-    // Skeleton overlay
+    // Synthetic capsule avatar (always update from keypoints)
     if (keypoints3d) {
-      buildSkeletonMesh(skeletonGroup, keypoints3d);
+      synthRenderer.update(keypoints3d);
+    }
+
+    // Skeleton overlay
+    if (viewMode === 'skeleton' && keypoints3d) {
+      buildSkeletonLines(skeletonGroup, keypoints3d);
     }
   }
 
   return (
-    <div className="relative w-full h-full" ref={mountRef}>
-      {!smplModel && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <p className="text-slate-500 text-sm">
-            Load SMPL model to see avatar · skeleton preview available
-          </p>
-        </div>
-      )}
-    </div>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }} ref={mountRef} />
   );
 }
 
-// ---- Skeleton visualisation helpers ----
+// ---- Skeleton line helper ----
 
 const MP_BONES = [
-  // Torso
-  [11, 12], [11, 23], [12, 24], [23, 24],
-  // Left arm
-  [11, 13], [13, 15],
-  // Right arm
-  [12, 14], [14, 16],
-  // Left leg
-  [23, 25], [25, 27], [27, 29], [29, 31],
-  // Right leg
-  [24, 26], [26, 28], [28, 30], [30, 32],
-  // Head
-  [0, 7], [0, 8], [7, 9], [8, 10],
+  [11,12],[11,23],[12,24],[23,24],   // torso
+  [11,13],[13,15],                    // left arm
+  [12,14],[14,16],                    // right arm
+  [23,25],[25,27],[27,29],            // left leg
+  [24,26],[26,28],[28,30],            // right leg
+  [0,7],[0,8],                        // head
 ];
 
-function buildSkeletonMesh(group, keypoints3d) {
-  // Remove existing children
-  while (group.children.length > 0) group.remove(group.children[0]);
+function buildSkeletonLines(group, kps) {
+  while (group.children.length) group.remove(group.children[0]);
+  if (!kps) return;
 
-  if (!keypoints3d) return;
-
-  // Joint spheres
-  const jointGeo  = new THREE.SphereGeometry(0.03, 8, 8);
-  const jointMat  = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
-
-  keypoints3d.forEach((kp) => {
+  const jGeo = new THREE.SphereGeometry(0.025, 6, 6);
+  const jMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+  kps.forEach(kp => {
     if (!kp || kp.confidence < 0.3) return;
-    const sphere = new THREE.Mesh(jointGeo, jointMat);
-    sphere.position.set(kp.x, kp.y, -kp.z); // flip Z for three.js convention
-    group.add(sphere);
+    const s = new THREE.Mesh(jGeo, jMat);
+    s.position.set(kp.x, kp.y, -kp.z);
+    group.add(s);
   });
 
-  // Bone lines
-  const points = [];
+  const pts = [];
   for (const [a, b] of MP_BONES) {
-    const kpA = keypoints3d[a], kpB = keypoints3d[b];
-    if (!kpA || !kpB || kpA.confidence < 0.3 || kpB.confidence < 0.3) continue;
-    points.push(new THREE.Vector3(kpA.x, kpA.y, -kpA.z));
-    points.push(new THREE.Vector3(kpB.x, kpB.y, -kpB.z));
+    const kA = kps[a], kB = kps[b];
+    if (!kA || !kB || kA.confidence < 0.3 || kB.confidence < 0.3) continue;
+    pts.push(new THREE.Vector3(kA.x, kA.y, -kA.z));
+    pts.push(new THREE.Vector3(kB.x, kB.y, -kB.z));
   }
-
-  if (points.length > 0) {
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xffaa00, linewidth: 2 });
-    group.add(new THREE.LineSegments(lineGeo, lineMat));
+  if (pts.length) {
+    group.add(new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0xffaa00 })
+    ));
   }
 }
