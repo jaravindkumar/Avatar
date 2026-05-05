@@ -1,0 +1,346 @@
+/* ============================================================
+   Avatar3D – Application Styles
+   Dark theme, no Tailwind dependency (uses plain CSS).
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-0: #0d1117;
+  --bg-1: #161b22;
+  --bg-2: #1e2530;
+  --bg-3: #252d3a;
+  --border: #30363d;
+  --text-1: #e6edf3;
+  --text-2: #8b949e;
+  --text-3: #6e7681;
+  --blue: #3b82f6;
+  --blue-dark: #1d4ed8;
+  --purple: #a855f7;
+  --green: #22c55e;
+  --red: #ef4444;
+}
+
+/* ---- Shell ---- */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+/* ---- Header ---- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+  flex-shrink: 0;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.app-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-3);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ---- Buttons ---- */
+
+.btn-primary {
+  padding: 0.4rem 0.9rem;
+  background: var(--purple);
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #9333ea; }
+
+.btn-secondary {
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-3);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-secondary:hover { background: var(--bg-2); color: var(--text-1); }
+
+.hidden-input { display: none; }
+
+/* ---- Toggle group ---- */
+
+.toggle-group {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.toggle-btn {
+  padding: 0.4rem 0.65rem;
+  background: var(--bg-2);
+  color: var(--text-2);
+  border: none;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.toggle-btn:not(:last-child) { border-right: 1px solid var(--border); }
+.toggle-btn.active { background: var(--blue); color: #fff; }
+.toggle-btn:hover:not(.active) { background: var(--bg-3); color: var(--text-1); }
+
+/* ---- Main area ---- */
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ---- Upload view ---- */
+
+.upload-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  gap: 2rem;
+}
+
+.hero-text {
+  text-align: center;
+  max-width: 38rem;
+}
+
+.hero-text h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+  color: var(--text-1);
+}
+
+.hero-text p {
+  font-size: 0.95rem;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.error-msg {
+  max-width: 32rem;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid var(--red);
+  border-radius: 0.75rem;
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+
+/* ---- Processing view ---- */
+
+.processing-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.pipeline-progress {
+  width: 100%;
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.video-dim-label {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+
+.steps-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-arrow { color: var(--text-3); font-size: 0.9rem; }
+
+.step-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.step-badge.done    { background: rgba(34, 197, 94, 0.15); color: #86efac; border-color: #166534; }
+.step-badge.active  { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border-color: #1e40af; animation: pulse 1.5s infinite; }
+.step-badge.pending { background: var(--bg-2); color: var(--text-3); border-color: var(--border); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+.progress-block { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+
+.progress-track {
+  width: 100%;
+  height: 0.625rem;
+  background: var(--bg-3);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.progress-count {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  text-align: right;
+}
+
+/* ---- Viewer ---- */
+
+.viewer-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.viewer-pane {
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebyside-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebyside-pane {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebyside-pane:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+/* ---- Playback bar ---- */
+
+.playback-bar {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-1);
+  flex-shrink: 0;
+}
+
+/* ---- Original frame view ---- */
+
+.original-frame-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.original-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.frame-label {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-2);
+  background: rgba(0,0,0,0.5);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+/* ---- Scrollbar ---- */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-1); }
+::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
