@@ -8,6 +8,7 @@ import { PoseExtractor }      from './utils/PoseExtractor.js';
 import { KalmanSmoother }     from './utils/KalmanSmoother.js';
 import { estimateDepthBatch } from './utils/DepthEstimator.js';
 import { SMPLSolver }         from './utils/SMPLSolver.js';
+import { loadSmplModel, parseBin, flattenJson } from './utils/loadSmplModel.js';
 import './App.css';
 
 const STAGES = {
@@ -70,17 +71,13 @@ export default function App() {
     setFrames3d(depth3d);
     setProcessingProgress({ step: 'Estimating depth...', done: depth3d.length, total: depth3d.length });
 
-    // Step 4: Load SMPL model (optional – served from /smpl_model.json)
+    // Step 4: Load SMPL model (optional – try binary first, then JSON)
     let model = null;
     try {
-      const resp = await fetch('/smpl_model.json');
-      if (resp.ok) {
-        const raw = await resp.json();
-        model = flattenSmplModel(raw);
-        setSmplModel(model);
-      }
+      model = await loadSmplModel('/smpl_model.bin', '/smpl_model.json');
+      if (model) setSmplModel(model);
     } catch {
-      // Skeleton-only mode if model unavailable
+      // Synthetic avatar mode if model unavailable
     }
 
     // Step 5: SMPL IK solving
@@ -116,14 +113,17 @@ export default function App() {
               Load SMPL Model
               <input
                 type="file"
-                accept=".json"
+                accept=".bin,.json"
                 className="hidden-input"
                 onChange={async (e) => {
                   const f = e.target.files[0];
                   if (!f) return;
                   try {
-                    const text = await f.text();
-                    setSmplModel(flattenSmplModel(JSON.parse(text)));
+                    if (f.name.endsWith('.bin')) {
+                      setSmplModel(parseBin(await f.arrayBuffer()));
+                    } else {
+                      setSmplModel(flattenJson(JSON.parse(await f.text())));
+                    }
                   } catch (err) {
                     setError(`Failed to load SMPL model: ${err.message}`);
                   }
@@ -307,25 +307,3 @@ function OriginalFrameView({ canvas, label }) {
   );
 }
 
-// ---- Helpers ----
-
-function flattenSmplModel(raw) {
-  const toFlat = (arr) => {
-    if (!arr) return null;
-    if (Array.isArray(arr[0])) return new Float32Array(arr.flat(Infinity));
-    return new Float32Array(arr);
-  };
-  return {
-    v_template:    toFlat(raw.v_template),
-    J_regressor:   toFlat(raw.J_regressor),
-    weights:       toFlat(raw.weights),
-    posedirs:      toFlat(raw.posedirs),
-    shapedirs:     toFlat(raw.shapedirs),
-    kintree_table: raw.kintree_table,
-    faces: raw.faces
-      ? new Uint32Array(Array.isArray(raw.faces[0]) ? raw.faces.flat() : raw.faces)
-      : null,
-    mean_pose:  toFlat(raw.mean_pose)  ?? new Float32Array(72),
-    mean_shape: toFlat(raw.mean_shape) ?? new Float32Array(10),
-  };
-}
