@@ -149,10 +149,18 @@ export default function AvatarViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [smplModel]);
 
-  // ---- Per-frame update ----
+  // ---- Per-frame update + camera tracking ----
   useEffect(() => {
     if (!threeRef.current) return;
     applyFrame(currentFrame, threeRef.current);
+
+    // Move the orbit target to follow the avatar centre so the
+    // camera always looks at the body rather than the world origin.
+    const { controls, synthRenderer } = threeRef.current;
+    if (synthRenderer && keypoints3d) {
+      const c = synthRenderer.avatarCenter;
+      controls.target.set(c.x, c.y, c.z);
+    }
   }, [currentFrame, frameParams, keypoints3d]);
 
   // ---- Wireframe toggle ----
